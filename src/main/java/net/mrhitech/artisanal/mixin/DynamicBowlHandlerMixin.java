@@ -25,13 +25,14 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.concurrent.atomic.AtomicReference;
 
 @Mixin(value = DynamicBowlHandler.class, remap = false)
 public abstract class DynamicBowlHandlerMixin extends FoodHandler.Dynamic implements IDynamicBowlHandler {
     
-    
+    // Next line doesn't work, so band-aid solution
     // @ModifyVariable(method = "onItemUse", at = @At("STORE"), ordinal = 0, remap = false) 
     private static ItemStack onItemUseMixin(ItemStack stack) {
         Artisanal.LOGGER.info("Entering method...");
@@ -54,8 +55,8 @@ public abstract class DynamicBowlHandlerMixin extends FoodHandler.Dynamic implem
         }
     }
     
-    @Overwrite
-    public static ItemStack onItemUse(ItemStack original, ItemStack result, LivingEntity entity)
+    @Inject(method = "onItemUse", at = @At("HEAD"), remap = false, cancellable = true)
+    private static void onItemUseInject(ItemStack original, ItemStack result, LivingEntity entity, CallbackInfoReturnable<ItemStack> info)
     {
         // This is a rare stackable-with-remainder-after-finished-using item
         // See: vanilla honey bottles
@@ -70,7 +71,9 @@ public abstract class DynamicBowlHandlerMixin extends FoodHandler.Dynamic implem
         
         if (result.isEmpty())
         {
-            return bowl;
+            info.setReturnValue(bowl);
+            info.cancel();
+            return;
         }
         else if (entity instanceof Player player && !player.getAbilities().instabuild)
         {
@@ -78,7 +81,9 @@ public abstract class DynamicBowlHandlerMixin extends FoodHandler.Dynamic implem
             // The super() call to finishUsingItem will handle decrementing the stack - only in non-creative - for us already.
             ItemHandlerHelper.giveItemToPlayer(player, bowl);
         }
-        return result;
+        info.setReturnValue(result);
+        info.cancel();
+        return;
     }
     
 }
